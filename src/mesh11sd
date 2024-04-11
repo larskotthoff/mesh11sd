@@ -19,6 +19,10 @@ get_mesh_iflist () {
 	iflist=""
 	all_ifcs=$(iw dev | awk -F "Interface " '$2>0{printf "%s " $2}')
 
+    syslogmessage="get_mesh_iflist -- all interfaces $all_ifcs"
+    debugtype="trace"
+    write_to_syslog
+
 	for iface in $all_ifcs; do
 		iftype=$(iw dev $iface info 2> /dev/null | grep "type" | awk '{printf "%s", $2}')
 
@@ -26,10 +30,18 @@ get_mesh_iflist () {
 			iflist="$iflist $iface"
 		fi
 	done
+
+    syslogmessage="get_mesh_iflist -- mesh interfaces $iflist"
+    debugtype="trace"
+    write_to_syslog
 }
 
 check_mesh_phantom () {
 	nodelist=$(iw dev $iface mpath dump | awk '{printf "%s,%s ", $1, $2}')
+
+    syslogmessage="check_mesh_phantom -- node list $nodelist"
+    debugtype="trace"
+    write_to_syslog
 
 	for node in $nodelist; do
 
@@ -72,9 +84,16 @@ get_params () {
 			rm "$buffer"
 		fi
 	fi
+
+    syslogmessage="get_params -- params $params"
+    debugtype="trace"
+    write_to_syslog
 }
 
 check_mesh_params () {
+    syslogmessage="check_mesh_params -- params $params"
+    debugtype="trace"
+    write_to_syslog
 
 	for param in $params; do
 
@@ -123,6 +142,10 @@ check_mesh_params () {
 }
 
 restart_mesh () {
+    syslogmessage="restart_mesh"
+    debugtype="trace"
+    write_to_syslog
+
 	set_txpower
 	mesh_gate_state
 	wifi
@@ -484,7 +507,15 @@ wait_for_interface () {
 	local ifname="$1"
 	local timeout=$interface_timeout
 
+    syslogmessage="wait_for_interface -- ifname $ifname, timeout $interface_timeout"
+    debugtype="trace"
+    write_to_syslog
+
 	for i in $(seq $timeout); do
+        syslogmessage="wait_for_interface -- $(ip link show $ifname)"
+        debugtype="trace"
+        write_to_syslog
+
 		if [ $(ip link show $ifname 2> /dev/null | grep -c -w "state UP") -eq 1 ]; then
 			ifstatus="up"
 			break
@@ -501,7 +532,7 @@ wait_for_interface () {
 
 # Write debug message to syslog
 # $syslogmessage contains the string to log
-# $debugtype contains the debug level string: debug, info, warn, notice, err, emerg.
+# $debugtype contains the debug level string: trace, debug, info, warn, notice, err, emerg.
 write_to_syslog() {
 
 	if [ "$mute" = 0 ]; then
@@ -520,6 +551,7 @@ write_to_syslog() {
 				"warn") debugnum=1;;
 				"info") debugnum=2;;
 				"debug") debugnum=3;;
+				"trace") debugnum=4;;
 				*) debugnum=1; debugtype="notice";;
 			esac
 
@@ -535,6 +567,10 @@ write_to_syslog() {
 mesh_gate_state() {
 	aplist=$(uci show wireless | grep "mode='ap'" | awk -F "." '{printf "%s ", $2}')
 
+    syslogmessage="mesh_gate_state -- aplist $aplist"
+    debugtype="trace"
+    write_to_syslog
+
 	for gate in $aplist; do
 		config_state=$(echo "get wireless.$gate.disabled" | uci batch 2> /dev/null)
 
@@ -545,6 +581,10 @@ mesh_gate_state() {
 			ucibatch="set wireless.$gate.disabled='1'"
 			echo "$ucibatch" | uci batch
 		fi
+
+        syslogmessage="mesh_gate_state -- uci $ucibatch"
+        debugtype="trace"
+        write_to_syslog
 	done
 }
 
@@ -560,6 +600,9 @@ set_txpower() {
 				ucibatch="set $radio.txpower='$txpower'"
 				echo "$ucibatch" | uci batch
 			fi
+            syslogmessage="set_txpower -- uci $ucibatch"
+            debugtype="trace"
+            write_to_syslog
 		done
 	fi
 }
@@ -567,6 +610,9 @@ set_txpower() {
 
 check_gate() {
 	is_gate=$(iw dev | grep -w "type AP")
+    syslogmessage="is_gate -- is_gate $is_gate"
+    debugtype="trace"
+    write_to_syslog
 
 	if [ -z "$is_gate" ]; then
 		uci set mesh11sd.mesh_params.mesh_connected_to_gate='0'
@@ -660,6 +706,9 @@ scan_channel() {
 	if [ "$link_to_portal" -gt 0 ]; then
 		# No link to portal. Maybe we are on the wrong channel, so scan for meshid to get channel
 		meshconfigs=$(uci show wireless 2> /dev/null | grep "mode='mesh'" | awk -F ".mode='mesh'" '{printf "%s " $1}')
+        syslogmessage="scan_channel -- meshconfigs $meshconfigs"
+        debugtype="trace"
+        write_to_syslog
 
 		if [ ! -z "$meshconfigs" ]; then
 
@@ -1022,6 +1071,10 @@ wait_for_mesh() {
 
 	local retries=2
 
+    syslogmessage="wait_for_mesh -- iflist $iflist, retries $retries"
+    debugtype="trace"
+    write_to_syslog
+
 	for iface in $iflist; do
 
 		for retry in $(seq $retries); do
@@ -1121,6 +1174,10 @@ all_nodes_rssi_update() {
 					phyindex=$(printf "%x" $phyindex)
 
 					echo "set wireless.m11s$phyindex.mesh_rssi_threshold='$mesh_rssi_threshold'" | uci batch
+
+                    syslogmessage="all_nodes_rssi_update -- set wireless.m11s$phyindex.mesh_rssi_threshold='$mesh_rssi_threshold'"
+                    debugtype="trace"
+                    write_to_syslog
 				done
 			fi
 
@@ -1150,6 +1207,10 @@ get_peers() {
 			peerlist="$peerlist ""$mac_from_la"
 		done
 	done
+
+    syslogmessage="get_peers -- peerlist $peerlist"
+    debugtype="trace"
+    write_to_syslog
 }
 
 ccpy_setup() {
@@ -1176,6 +1237,10 @@ ccpy_setup() {
 			break
 		done
 	fi
+
+    syslogmessage="ccpy_setup -- connectlist $connectlist"
+    debugtype="trace"
+    write_to_syslog
 }
 
 ndp_scan_peer() {
@@ -1197,6 +1262,10 @@ refresh_bridgemac() {
 	wait_for_interface "$device"
 	devicemac=$(ip link | grep -A 1 "$device:" | grep -w "link/ether" | awk '{printf "%s", $2}')
 	echo "device=\"$device\" ; devicemac=\"$devicemac\"" > /tmp/devicemac
+
+    syslogmessage="refresh_bridgemac -- device=\"$device\" ; devicemac=\"$devicemac\""
+    debugtype="trace"
+    write_to_syslog
 }
 
 auto_config() {
@@ -1466,9 +1535,8 @@ arp_setup() {
 	echo 5 > /proc/sys/net/ipv6/conf/all/router_solicitations
 	echo 5 > /proc/sys/net/ipv6/conf/default/router_solicitations
 	echo 5 > /proc/sys/net/ipv6/conf/$device/router_solicitations
-
-
 }
+
 check_path_changes() {
 	# get list of interfaces
 	get_mesh_iflist
@@ -1619,6 +1687,10 @@ block_bridge_loops() {
 	refresh_bridgemac
 
 	if [ "$mac_changed" -eq 1 ]; then
+        syslogmessage="block_bridge_loops -- mac changed, restart mesh"
+        debugtype="trace"
+        write_to_syslog
+
 		restart_mesh
 	fi
 
